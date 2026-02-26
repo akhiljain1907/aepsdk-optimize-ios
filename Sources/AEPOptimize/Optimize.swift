@@ -67,6 +67,12 @@ public class Optimize: NSObject, Extension {
         )
     #endif
 
+    /// Static dictionary mapping original request event IDs to Edge event IDs.
+    /// This allows the public API to retrieve the Edge event ID even when the extension times out.
+    static var requestToEdgeEventIds = ThreadSafeDictionary<String, String>(
+        identifier: "com.adobe.optimize.requestToEdgeEventIds"
+    )
+
     /// Array containing recoverable network error codes being retried by Edge Network Service
     private let recoverableNetworkErrorCodes: [Int] = [OptimizeConstants.HTTPResponseCodes.clientTimeout.rawValue,
                                                        OptimizeConstants.HTTPResponseCodes.tooManyRequests.rawValue,
@@ -274,6 +280,8 @@ public class Optimize: NSObject, Extension {
             // Storing the request event UUID to compare and process only the anticipated response in the extension.
             self.updateRequestEventIdsInProgress[edgeEvent.id.uuidString] = validDecisionScopes
 
+            // Store mapping from original request event ID to Edge event ID for public API timeout handling
+            Optimize.requestToEdgeEventIds[event.id.uuidString] = edgeEvent.id.uuidString
             // add the Edge event to update propositions in the events queue.
             self.eventsQueue.add(edgeEvent)
 
@@ -287,8 +295,9 @@ public class Optimize: NSObject, Extension {
                     else {
                         // response event failed or timed out, remove this event's ID from the requested event IDs dictionary, dispatch an error response event and kick-off queue.
                         self.updateRequestEventIdsInProgress.removeValue(forKey: edgeEvent.id.uuidString)
+                        Optimize.requestToEdgeEventIds.removeValue(forKey: event.id.uuidString)
                         self.propositionsInProgress.removeAll()
-                        let timeoutError = AEPOptimizeError.createAEPOptimizeTimeoutError()
+                        let timeoutError = AEPOptimizeError.createAEPOptimizeTimeoutError(requestEventId: edgeEvent.id.uuidString)
                         self.dispatch(event: event.createErrorResponseEvent(timeoutError))
                         self.eventsQueue.start()
                         return
@@ -313,6 +322,9 @@ public class Optimize: NSObject, Extension {
                         data: responseData
                     )
                     dispatch(event: responseEventToSend)
+
+                    // Clean up request-to-edge event ID mapping after response is dispatched
+                    Optimize.requestToEdgeEventIds.removeValue(forKey: event.id.uuidString)
 
                     let updateCompleteEvent = responseEvent.createChainedEvent(name: OptimizeConstants.EventNames.OPTIMIZE_UPDATE_COMPLETE,
                                                                                type: EventType.optimize,
@@ -481,13 +493,10 @@ public class Optimize: NSObject, Extension {
                                                         status: errorStatus,
                                                         title: errorTitle,
                                                         detail: errorDetail,
-                                                        report: errorReport)
-                guard let edgeEventRequestId = event.requestEventId else {
-                    Log.debug(label: OptimizeConstants.LOG_TAG, "No valid edge event request ID found for error response event.")
-                    return
-                }
+                                                        report: errorReport,
+                                                        requestEventId: requestEventId)
                 // store the error response as an AEPOptimizeError in error dictionary per edge request
-                self.updateRequestEventIdsErrors[edgeEventRequestId] = aepOptimizeError
+                self.updateRequestEventIdsErrors[requestEventId] = aepOptimizeError
             }
         }
     }

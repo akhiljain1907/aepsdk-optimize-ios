@@ -24,15 +24,15 @@ public class Optimize: NSObject, Extension {
     public let metadata: [String: String]? = nil
     public let runtime: ExtensionRuntime
 
-    // Operation orderer used to maintain the order of update and get propositions events.
-    // It ensures any update propositions requests issued before a get propositions call are completed
-    // and the get propositions request is fulfilled from the latest cached content.
+    /// Operation orderer used to maintain the order of update and get propositions events.
+    /// It ensures any update propositions requests issued before a get propositions call are completed
+    /// and the get propositions request is fulfilled from the latest cached content.
     private let eventsQueue = OperationOrderer<Event>("OptimizeEvents")
 
-    // Dispatch queue used to protect against simultaneous access of our containers from multiple threads
+    /// Dispatch queue used to protect against simultaneous access of our containers from multiple threads
     private let queue: DispatchQueue = .init(label: "com.adobe.optimize.containers.queue")
 
-    // a dictionary containing the update event IDs and corresponding errors as received from Edge SDK
+    /// a dictionary containing the update event IDs and corresponding errors as received from Edge SDK
     private var updateRequestEventIdsErrors = ThreadSafeDictionary<String, AEPOptimizeError>(
         identifier: "com.adobe.optimize.updateRequestEventIdsErrors"
     )

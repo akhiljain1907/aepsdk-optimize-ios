@@ -115,7 +115,7 @@ enum OptimizeConstants {
     }
 
     enum JsonValues {
-        static let EE_EVENT_TYPE_PERSONALIZATION = "personalization.request"
+        static let EE_EVENT_TYPE_PERSONALIZATION = "decisioning.propositionFetch"
         static let EE_EVENT_TYPE_PROPOSITION_DISPLAY = "decisioning.propositionDisplay"
         static let EE_EVENT_TYPE_PROPOSITION_INTERACT = "decisioning.propositionInteract"
 
